@@ -26,7 +26,7 @@
 
 Current sampling of ring signatures to create aggregated signatures in MobileCoin uses a uniform sampling distribution. 
 
-This unintentionally creates a bias towards younger signatures being the most likely candidate for the genuine signature and skews the selection bias which presents a potential de-anonymization security risk amongst other potential loopholes that could be possibly exploited using on-chain metadata. 
+This unintentionally creates a bias towards younger signatures being the most likely candidate for the genuine signature and skews the selection bias which presents a potential de-anonymization security risk amongst other potential loopholes that could be possibly exploited. It should be noted that given a secure enclave setup, the security risk is negated. It should be noted that this vulnerability is for fog users that aren't using a secure enclave setup. A potential attacker could store multiple aggregate ring signatures in a database somewhere and given the selection bias be able to determine which signatures are genuine and which are decoys.  
 
 
 # Motivation
