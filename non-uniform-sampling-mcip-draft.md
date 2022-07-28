@@ -1,7 +1,7 @@
 * Feature Name: `Non-Uniform Ring Signature Sampling`
-* Start Date: TBD
+* Start Date: 9/??/22
 * MCIP PR:
-  [mcips #?](https://github.com/mobilecoinfoundation/mcips/)
+  [mcips #42](https://github.com/mobilecoinfoundation/mcips/)
 * Tracking Issue:
   [mobilecoin #?](https://github.com/mobilecoinfoundation/mobilecoin/issues/)
 
@@ -26,7 +26,7 @@
 
 Current sampling of ring signatures to create aggregated signatures in MobileCoin uses a uniform sampling distribution. 
 
-This unintentionally creates a bias towards younger signatures being the most likely candidate for the genuine signature and skews the selection bias which presents a potential de-anonymization security risk amongst other potential loopholes that could be possibly exploited. It should be noted that given a secure enclave setup, the security risk is negated. It should be noted that this vulnerability is for fog users that aren't using a secure enclave setup. A potential attacker could store multiple aggregate ring signatures in a database somewhere and given the selection bias be able to determine which signatures are genuine and which are decoys.  
+This unintentionally creates a bias towards younger signatures being the most likely candidate for the genuine signature and skews the selection bias which presents a potential de-anonymization security risk amongst other potential loopholes that could be possibly exploited. It should be noted that given a secure enclave setup, the security risk is negated. It should be noted that this vulnerability is for fog users that aren't using a secure enclave setup (such as some fog users). A potential attacker could store multiple aggregate ring signatures in a database somewhere and given the selection bias be able to determine which signatures are genuine and which are decoys.  
 
 
 # Motivation
@@ -42,78 +42,121 @@ The motivation behind this project is born out of the presently real and potenti
 
 The Monero community recognized this problem and came up with their own solution to the security problem presented by uniform sampling. 
 
-Conversations were made in the Monero community about possible ways to fix this problem and were discussed, the current implementation of the official Monero GUI uses an algorithm for sampling mixins that is non-uniform. Their solution implemented a log-gamma distribution with shape parameter 19.28 and scale 1/1.6 rather than a uniform sampling distribution for the official Monero GUI wallet. 
+Conversations were made about possible ways to fix this problem and were discussed, the workable solution that was implemented to fix this uses an algorithm for sampling mixins that is non-uniform. This solution implemented a log-gamma distribution with shape parameter 19.28 and scale 1/1.6 rather than a uniform sampling distribution.
 
-Other distributions of other wallets use other methods such as monero-lws. These algorithms seem to effectively solve the problem presented by using uniform sampling distributions of mixins. Given the probabilistic nature of this problem it is perhaps impossible to completely erase the possibility of tracing through mixin metadata but it can at the very least become a far more difficult task with negligible possibility of success.
+Other distributions of other wallets use other methods such as monero-lws. These algorithms seem to effectively solve the problem presented by using uniform sampling distributions of mixins. Given the probabilistic nature of this problem it is perhaps impossible to completely erase the possibility of tracing through mixin data but it can at the very least become a far more difficult task with negligible possibility of success.
 
-One of the largest differences between the Monero mixin sampling solution and what MobileCoin could alternatively use is that the Monero solution that was utilized relied upon pre-RingCT data that was available. Using this available data they were able to come up with the fine tuned log-gamma distribution sampling solution that they employed that all but erased the problem for the most part. 
+One of the largest differences between other blockchains mixin sampling solutions and what MobileCoin could alternatively use is that the solutions that were utilized relied upon pre-RingCT data that was available. Using this available data they were able to come up with the fine tuned log-gamma distribution sampling solution that they employed that all but erased the problem for the most part. 
 
-MobileCoin does not have pre-RingCT data available and so such a fine tuned solution would probably be outside the scope of possibility as no potential data curve is available to fit to. Despite this fact, some form of non-uniform sampling would be better than sticking with the current uniform sampling method currently employed. 
+MobileCoin does not have pre-RingCT data available and so such a fine tuned solution could potentially be outside the scope of possibility as no potential data curve is available to fit to. Despite this fact, some form of non-uniform sampling would be better than sticking with the current uniform sampling method currently employed. 
 
 Finding which method of non-uniform sampling to choose from has its own difficulties. 
 
 # Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
 
-There will be two classifications of non-uniform sampling mechanisms that could be potentially utilized:
+There are two types of non-uniform sampling mechanisms that will be discussed in this mcip, each having their own subclasses each with their own set of characteristics as well but mostly following the same methods:
 1. Additive non-uniform sampling
 2. Stochastic jitting non-uniform sampling
 
-'''
-more to be added here
-'''
+(Adam draft note: maybe give step by step explanation of how attacker could use this exploit, also: mention how testing might work)
 
 # Uniform Sampling 
 [Uniform Sampling]: (#uniform-sampling)
 In this framework we sample keys uniformly at random
 
+
+Below is a Rust code snippet demonstrating uniform sampling: 
+(Adam draft note: Maybe it could be better to just show a code snippet of the exact uniform sampling mechanism currently being used?)
+
+```
+use rand::distributions::{Distribution, Uniform};
+
+let between = Uniform::from(10..10000);
+let mut rng = rand::thread_rng();
+let mut sum = 0;
+for _ in 0..1000 {
+    sum += between.sample(&mut rng);
+}
+println!("{}", sum);
+
+// for a single sample:
+
+use rand::Rng;
+
+let mut rng = rand::thread_rng();
+println!("{}", rng.gen_range(0..10));
+
+```
+
 # Security Risks 
 [Security Risks]: (#security-risks)
-By uniformly sampling keys at random to put into an aggregate ring signature, security risks can present themselves. The larger the possible sample of signatures there is if there is a uniform sampling distribution the more likely there is for the non-dummy (actual) signature that signed the transaction to be the earliest signature. This allows the anonymity afforded by the RingCT mechanism to be circumvented by easily recognizing from the publically available on chain-data that the earliest signature is the legitimate one. 
+By uniformly sampling keys at random to put into an aggregate ring signature, it is possible to differentiate between the decoy signatures and the genuine ones. For a more in depth explanation of how this is possible, see the Foundations of Ring sampling paper linked in the prior-art section of this mcip. The larger the possible sample of signatures there is if there is a uniform sampling distribution the more likely there is for the non-dummy (actual) signature that signed the transaction to be the earliest signature. This allows the anonymity afforded by the RingCT mechanism to be circumvented by recognizing that the earliest signature is the most likely the legitimate one. 
 
 
 
 # Non-uniform sampling 
 [Non-Uniform Sampling]: (#non-uniform-sampling)
-In this framework we employ a to-be-determined method for sampling keys non-uniformly at random
+In this framework we employ a to-be-determined method for sampling keys non-uniformly at random.
+
+Below is a Rust code snippet demonstrating non-uniform sampling:
+
+```
+use rand::distributions::{Bernoulli, Distribution};
+
+let d = Bernoulli::new(0.3).unwrap();
+let v = d.sample(&mut rand::thread_rng());
+println!("{} is from a Bernoulli distribution", v);
+```
+
+This sampling method utilizes Bernoulli sampling. Bernoulli sampling is a stochastic jittering method of sampling discrete values, one of many possible methods of non-uniform sampling that could potentially be implemented. 
 
 # Methods 
 [Methods]: (#methods)
 ### Additive Non-uniform Sampling
-Explanation of additive sampling
+Explanation of additive non-uniform sampling
 
-Pros:
-* 
+Additive Random Sampling (ARS) as a sampling method provides alias-free processing of analogic signals. As its name indicates, the sampling instant in this mode is obtained by adding a random variable to the previous one in the sequence.  As the probability density function of the sum of two random variables is the convolution of their probability density function, the probability density function of the nth instant t_n is given by adding all the probabilities together. In Additive Random Sampling with a Gaussian distribution a signal can be easily separated from noise for a number of points greater than 100. Nonetheless, it can be seen that also in this mode the mean sampling frequency can be a way smaller than the Nyquist rate also, but with a limitation on the number of samples to be greater than 100. This could be applied for our specific use case as a potential solution.
 
-Cons:
-* 
+(Adam draft note: I'm thinking of cutting out the additive random non-uniform sampling section from this mcip as the stochastic jitting non-uniform sampling section seems to make a lot more sense to me, or maybe this just needs more work? Inutuitively I don't think additive random sampling will be what we go with but then again it might simply be that I don't understand it well enough yet.)
 
 
 #### Stochastic jitting Non-uniform sampling
-Explanation of stochastic jitting non-uniform sampling
+Explanation of stochastic non-uniform sampling
 
-Pros:
-* 
+In stochastic sampling, every point has a finite probability of being hit. Stochastic sampling is extremely powerful as applied to the human bodies ocular visual system which is much more sensitive to aliases than noise. The human eye contains an array of non-uniformly distributed photoreceptors and this is the reason that the eye does not produce its own aliasing effects. Photoreceptor cells in the fovea are tightly packed and the lens acts as an antialiasing filter. However in the region outside the fovea, the density is much less and the cells are non-uniformly distributed.
+Different aliasing techniques are suitable for different types of rendering. Stochastic sampling is almost associated with ray tracers.
 
-Cons:
-* 
+The type of randomness used in this case dictates the spectral character of the noise into which the higher frequencies are dispersed.
+
+There are three classes of non-uniform patterns
+
+Poisson
+This pattern is generated by adding points at random locations until the area is full. This distribution is uniform. The Fourier transform is random too with values distributed over all the frequencies. So, it is not very useful as a filter as it does not discriminate between high and low frequencies. Convolution with this filter would scatter both high and low frequencies alike and as a result, the image is masked in white noise. It might be possible to use a Number Theoretic Transform in our specific sampling use case which could also have the added benefit of allowing for more efficient multiplicative computational processes. 
+
+Poisson Disc
+This is a generalization of the Poisson sampling whereby each sample point satisfies a minimum distance constraint. This pattern is achieved by generating uniformly distributed points as in Poisson sampling and retaining those that satisfy the minimum distance constraint. This method is extremely expensive from a computational complexity perspective being incredibly inefficient to implement and so for our purposes should probably not be realistically considered but is worth mentioning especially in comparison with the other classes. 
+
+Jittered
+Jiterring is done by perturbing sample locations that are spaced out regularly. The jittered pattern is more clumsy in appearance. Jittering approximates the Poisson disc but the radius of the disc is smaller.
+This increase in low frequency noise would cause an image convoluted with this filter to scatter the high frequencies into low frequencies. To return to the human visual system example, our ocular visual system is more sensitive to low frequencies and thus jittering is inferior to Poisson disc sampling. The same image appears noisier in the jittered case than when using Poisson disc distribution.
+Sampling using jittering involves randomly shifting the uniform sample points in the two spatial variables, the sample point usually at the center of a pixel is perturbed to some location within it. Furthernmore, sampling using a Poisson disc distribution is more problematic as it could require storing the values in a look up table. The Rust code snippet that was added in the non-uniform sampling uses Bernoulli sampling which is an example of this class of non-uniform patterns. 
+
+(Adam draft note: I can include here a Rust code snippet that provides the exact mechanism that could be used for our example using the visual field example again)
 
 ## Implementation details and project difficulty
 After possible solutions have been researched, the most likely replacement for the current implementation will be considered in terms of difficulty of implementation in terms of replacing the current uniform sampling mechanism. Project difficulty, possible methods, libraries to be used, timelines for production etc. 
 
 Nonuniform sampling is based on Lagrange interpolation and the relationship between itself and the (uniform) sampling theorem. The Nyquist-Shannon sampling theorem can be applied as well to find the exact function needed to generate a truly random set of sample keys.  
 
-
-
-
 # Drawbacks
 [drawbacks]: #drawbacks
 
-The primary drawback to this project is merely time and project difficulty required to implement it. From a technical perspective there is little to no drawback unless retroactively it turns out that whatever non-uniform sampling method that has been employed to replace the current mechanism turns out to present a new security risk. This seems unlikely and so the only real drawback likely would be if it turns out the problem is not solved by implementing a new mechanism, but since this problem already exists in the current framework this could be considered to not be considerably problematic. Considerably, there is null drawback besides time constraints to implement.
+The primary drawback to this project is merely time and project difficulty required to implement it. From a technical perspective there is little to no drawback unless retroactively it turns out that whatever non-uniform sampling method that has been employed to replace the current mechanism turns out to present a new security risk. This seems unlikely and so the only real drawback likely would be if it turns out the problem is not solved by implementing a new mechanism, but since this problem already exists in the current framework this could be considered to not be considerably problematic. Conclusively there is null drawback besides time and labour constraints to implement.
 
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
-This seems like a rational action to implement and project to execute as there is null drawback and certain positive gain. Essentially, this project has to be implemented at some point in the future to maintain the security features. 
+This seems like a rational action to implement and project to execute as there is null drawback and certain positive potential gain. Essentially, this project has to be implemented at some point in the future to maintain the security features. 
 
 Alternatively if it's decided its better to focus attention elsewhere, since this does not present any absolutely endgame breaking immediate security risk this could be a potential alternative course of action.  
 
@@ -121,16 +164,26 @@ Alternatively if it's decided its better to focus attention elsewhere, since thi
 # Prior art
 [prior-art]: #prior-art
 
-* Monero docs on log-gamma soln: 
+* Monero docs on log-gamma soln: https://www.getmonero.org/2021/09/20/post-mortem-of-decoy-selection-bugs.html
+
+* Monero conversations on the topic of decoy selection: https://forum.monero.space/d/144-monero-research-lab-meeting-wed-20-october-2021-at-1700-utc
+
+* Foundations of Ring Sampling: https://petsymposium.org/2021/files/papers/issue3/popets-2021-0047.pdf
+
+* Monero Blockchain traceability: https://arxiv.org/abs/1704.04299
+
+* Path ORAM proposal: https://drive.google.com/file/d/1NKRVK7-MXr1nolgUdH5SdbIC8yIG_ft3/view
+
+* koe mcip 17 draft: https://github.com/mobilecoinfoundation/mcips/pull/17/files (Adam draft note: might be good to reference some of the code snippets used here? There's a lot of good explanations of vulnerabilities better than mine as well.)
 
 
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-We don't know how we are going to implement a successful RingCT non-uniform sampling distribution as fine tuned as the one used for Monero without de-anonymized pre-RingCT data. 
+We don't know how we are going to implement a successful RingCT non-uniform sampling distribution as fine tuned as the one used in other blockchain and cryptography projects that use decoy signatures without de-anonymized pre-RingCT data. While this is mostly a security problem for systems that don't use secure enclaves (fog users for instance) making it less of a security risk than having all the RingCT data being publically accessible. We don't know the potential future vulnerabilities that could be created by having uniformly sampled decoy signatures being utilized in RingCT signatures that are stored insecurely.  
 
 # Future possibilities
 [future-possibilities]: #future-possibilities
 
-While this MCIP focuses on non-uniform sampling, potential discoveries from doing research into this avenue could turn out to be useful elsewhere in other projects. 
+While this MCIP focuses on non-uniform sampling, potential discoveries from doing research into this avenue could turn out to be useful elsewhere in other projects. A novel non-uniform mixin sampling technique could have far reaching cryptographic applications well outside the scope of this project if developed as a possible solution. 
 
